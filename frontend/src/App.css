@@ -339,6 +339,10 @@
   background: #888888;
 }
 
+.result-chip-dot--embedding {
+  background: #0891B2;
+}
+
 .result-card-body {
   flex: 1;
   display: flex;

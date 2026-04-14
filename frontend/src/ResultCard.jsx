@@ -19,7 +19,7 @@ function ExpandIcon() {
 }
 
 
-export default function ResultCard({ model, text, kgLabel, promptLabel, status, triplets, highlight, onDelete }) {
+export default function ResultCard({ model, text, kgLabel, promptLabel, embeddingLabel, status, triplets, highlight, onDelete }) {
   const [expanded, setExpanded] = useState(false)
   const { tripleCount, entityCount, relationCount } = useStats(status === 'done' ? triplets : [])
 
@@ -45,6 +45,13 @@ export default function ResultCard({ model, text, kgLabel, promptLabel, status, 
           <span className="result-chip-dot result-chip-dot--prompt" />
           {promptLabel}
         </span>
+
+        {embeddingLabel && (
+          <span className="result-chip">
+            <span className="result-chip-dot result-chip-dot--embedding" />
+            {embeddingLabel}
+          </span>
+        )}
 
         {status === 'done' && (
           <div className="result-card-stats">
@@ -108,6 +115,11 @@ export default function ResultCard({ model, text, kgLabel, promptLabel, status, 
                 <span className="result-chip">
                   <span className="result-chip-dot result-chip-dot--prompt" />{promptLabel}
                 </span>
+                {embeddingLabel && (
+                  <span className="result-chip">
+                    <span className="result-chip-dot result-chip-dot--embedding" />{embeddingLabel}
+                  </span>
+                )}
               </div>
               <button
                 className="kg-modal-close"

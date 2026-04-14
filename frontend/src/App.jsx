@@ -92,14 +92,15 @@ function App() {
     const cardId = Date.now()
 
     setCards(prev => [...prev, {
-      id:          cardId,
+      id:             cardId,
       model,
       text,
-      kgLabel:     sel.kgLabel,
-      promptLabel: sel.promptLabel,
-      status:      'loading',
-      triplets:    [],
-      highlight:   [],
+      kgLabel:        sel.kgLabel,
+      promptLabel:    sel.promptLabel,
+      embeddingLabel: sel.embeddingLabel || null,
+      status:         'loading',
+      triplets:       [],
+      highlight:      [],
     }])
     setExpanded(false)
 
@@ -110,8 +111,9 @@ function App() {
         body:    JSON.stringify({
           text,
           model,
-          prompt_type: sel.prompt,
-          kg_type:     sel.kg,
+          prompt_type:     sel.prompt,
+          kg_type:         sel.kg,
+          embedding_model: sel.embedding || 'contriever',
         }),
       })
       if (!res.ok) throw new Error(res.statusText)
