@@ -7,4 +7,9 @@ export default defineConfig({
   define: {
     'process.env.NODE_ENV': JSON.stringify('development'),
   },
+  server: {
+    proxy: {
+      '/api': 'http://127.0.0.1:8000',
+    },
+  },
 })

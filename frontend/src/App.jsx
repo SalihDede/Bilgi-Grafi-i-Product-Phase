@@ -1,17 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './App.css'
 import GraphCanvas from './GraphCanvas'
 import PlusGraph   from './PlusGraph'
 import ResultCard  from './ResultCard'
-
-const MODELS = [
-  'GPT-4o',
-  'GPT-4o mini',
-  'Claude 3.5 Sonnet',
-  'Claude 3 Haiku',
-  'Gemini 1.5 Pro',
-  'Llama 3.1 70B',
-]
 
 const GROUPS = [
   {
@@ -73,11 +64,21 @@ const GROUPS = [
 const MAX = 300
 
 function App() {
-  const [text, setText]         = useState('')
-  const [model, setModel]       = useState(MODELS[0])
+  const [text, setText]           = useState('')
+  const [models, setModels]       = useState([])
+  const [model, setModel]         = useState('')
   const [submitted, setSubmitted] = useState(false)
-  const [expanded, setExpanded] = useState(false)
-  const [cards, setCards]       = useState([])
+  const [expanded, setExpanded]   = useState(false)
+  const [cards, setCards]         = useState([])
+
+  useEffect(() => {
+    fetch('/api/models')
+      .then(r => r.json())
+      .then(data => {
+        setModels(data)
+        if (data.length > 0) setModel(data[0].id)
+      })
+  }, [])
 
   const isActive = text.length > 0
 
@@ -86,16 +87,45 @@ function App() {
     setSubmitted(true)
   }
 
-  function handleGraphSend(sel) {
+  async function handleGraphSend(sel) {
     if (cards.length >= 3) return
+    const cardId = Date.now()
+
     setCards(prev => [...prev, {
-      id:          Date.now(),
+      id:          cardId,
       model,
       text,
       kgLabel:     sel.kgLabel,
       promptLabel: sel.promptLabel,
+      status:      'loading',
+      triplets:    [],
+      highlight:   [],
     }])
     setExpanded(false)
+
+    try {
+      const res = await fetch('/api/extract', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          text,
+          model,
+          prompt_type: sel.prompt,
+          kg_type:     sel.kg,
+        }),
+      })
+      if (!res.ok) throw new Error(res.statusText)
+      const data = await res.json()
+      setCards(prev => prev.map(c => c.id === cardId
+        ? { ...c, status: 'done', triplets: data.triplets, highlight: data.highlight ?? [] }
+        : c
+      ))
+    } catch {
+      setCards(prev => prev.map(c => c.id === cardId
+        ? { ...c, status: 'error' }
+        : c
+      ))
+    }
   }
 
   return (
@@ -119,8 +149,8 @@ function App() {
                 value={model}
                 onChange={e => setModel(e.target.value)}
               >
-                {MODELS.map(m => (
-                  <option key={m} value={m}>{m}</option>
+                {models.map(m => (
+                  <option key={m.id} value={m.id}>{m.label}</option>
                 ))}
               </select>
             </div>
