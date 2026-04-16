@@ -24,6 +24,7 @@ app.add_middleware(
 BASE_DIR       = os.path.dirname(__file__)
 MODELS_FILE    = os.path.join(BASE_DIR, "allowedOpenroutherLLMModels.json")
 WIKONTIC_URL   = os.getenv("WIKONTIC_URL", "http://localhost:8001")
+KGGEN_URL      = os.getenv("KGGEN_URL",   "http://localhost:8002")
 
 
 # ── Models ────────────────────────────────────────────────────────────────────
@@ -44,30 +45,33 @@ class ExtractRequest(BaseModel):
     embedding_model: str = "contriever" # contriever | bge_m3 | turkish_e5_large | mft_random
 
 
-async def _extract_wikontic(text: str, llm_model: str, embedding_model: str) -> list[dict]:
-    """Calls the Wikontic service and normalises response to the app's Turkish field names."""
-    payload = {
-        "text":            text,
-        "embedding_model": embedding_model,
-        "llm_model":       llm_model,
-    }
-    async with httpx.AsyncClient(timeout=120) as client:
-        resp = await client.post(f"{WIKONTIC_URL}/extract", json=payload)
-        resp.raise_for_status()
-
-    raw_triplets = resp.json().get("triplets", [])
-
-    # Map Wikontic field names → app field names
-    normalised = []
-    for t in raw_triplets:
-        normalised.append({
+def _normalize_triplets(raw: list[dict]) -> list[dict]:
+    return [
+        {
             "baş":      t.get("subject", ""),
             "baş_tipi": t.get("subject_type", ""),
             "ilişki":   t.get("relation", ""),
             "uç":       t.get("object", ""),
             "uç_tipi":  t.get("object_type", ""),
-        })
-    return normalised
+        }
+        for t in raw
+    ]
+
+
+async def _extract_wikontic(text: str, llm_model: str, embedding_model: str) -> list[dict]:
+    payload = {"text": text, "embedding_model": embedding_model, "llm_model": llm_model}
+    async with httpx.AsyncClient(timeout=120) as client:
+        resp = await client.post(f"{WIKONTIC_URL}/extract", json=payload)
+    resp.raise_for_status()
+    return _normalize_triplets(resp.json().get("triplets", []))
+
+
+async def _extract_kggen(text: str, llm_model: str) -> list[dict]:
+    payload = {"text": text, "llm_model": llm_model}
+    async with httpx.AsyncClient(timeout=180) as client:
+        resp = await client.post(f"{KGGEN_URL}/extract", json=payload)
+    resp.raise_for_status()
+    return _normalize_triplets(resp.json().get("triplets", []))
 
 
 @app.post("/api/extract")
@@ -75,12 +79,13 @@ async def extract(body: ExtractRequest):
     try:
         if body.kg_type == "wicontic":
             triplets = await _extract_wikontic(body.text, body.model, body.embedding_model)
+        elif body.kg_type == "kggen":
+            triplets = await _extract_kggen(body.text, body.model)
         else:
             triplets = await extract_triplets(body.text, body.model)
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
 
-    # Baş varlıkları highlight olarak döndür
     highlight = list({t.get("baş", "") for t in triplets if t.get("baş")})
     return {"triplets": triplets, "highlight": highlight}
 
